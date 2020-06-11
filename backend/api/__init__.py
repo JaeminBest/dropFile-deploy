@@ -1,7 +1,13 @@
 import os
 
+ALLOW_ALL = "*"
+
+DATA_DIR = '/home/data'
+os.makedirs(DATA_DIR,exist_ok=True)
+
+
 def add_access_control_headers(response):
-  response["Access-Control-Allow-Origin"] = os.environ['ADMIN_SERVER_CORS_ORIGIN']
-  response["Access-Control-Allow-Methods"] = os.environ['ADMIN_SERVER_CORS_METHODS']
+  response["Access-Control-Allow-Origin"] = ALLOW_ALL
+  response["Access-Control-Allow-Methods"] = ALLOW_ALL
   response["Access-Control-Max-Age"] = os.environ['ADMIN_SERVER_CORS_MAX_AGE']
-  response["Access-Control-Allow-Headers"] = os.environ['ADMIN_SERVER_CORS_HEADERS']
+  response["Access-Control-Allow-Headers"] = ALLOW_ALL

@@ -10,9 +10,9 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 class DirectorySerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Directory
-        fields = ['name','path']
+        fields = ['pk','path']
 
 class FileSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = File
-        fields = ['name','directory']
+        fields = ['pk','path']

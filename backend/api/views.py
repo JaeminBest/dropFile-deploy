@@ -1,26 +1,32 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 from rest_framework import viewsets
+from rest_framework.response import Response
+from rest_framework.decorators import action
 from django.contrib.auth.models import User
 from django.core.files.storage import FileSystemStorage
-from background_task import Tasks
+from django.views.decorators.csrf import csrf_exempt
+
+from django.shortcuts import get_object_or_404
 
 import secrets
 import os
-import subprocess
 import pickle
+import json
+import shutil
 
+from . import add_access_control_headers
 from .models import Directory, File
 from .serializers import UserSerializer, DirectorySerializer, FileSerializer
 from .dropFile import dropfile
-from .tasks import dropfile_env_update
+from .tasks import dropfile_env_update_helper,dropfile_env_quick_update,dropfile_env_update
 
-TMP_DIR = '/data'
+DATA_DIR = '/home/data'
 STORAGE_DIR = '/storage'
-DTM_path = os.path.join(TMP_DIR,'dtm.pkl')
-VOCAB_path = os.path.join(TMP_DIR,'vocab.pkl')
-FLST_path = os.path.join(TMP_DIR,'filelist.pkl')
-SYNDICT_path = os.path.join(TMP_DIR,'syndict.pkl')
+DTM_path = os.path.join(DATA_DIR,'dtm.pkl')
+VOCAB_path = os.path.join(DATA_DIR,'vocab.pkl')
+FLST_path = os.path.join(DATA_DIR,'filelist.pkl')
+SYNDICT_path = os.path.join(DATA_DIR,'syndict.pkl')
 
 # Create your views here.
 def index(request):
@@ -35,16 +41,99 @@ class DirectoryViewSet(viewsets.ModelViewSet):
     queryset = Directory.objects.all()
     serializer_class = DirectorySerializer
     
+    '''
+    directory delete overwrite
+    '''
+    def destroy(self,request,pk=None):
+        directory = self.get_object()
+        path = directory.path
+        shutil.rmtree(path)
+        for file in directory.file_set.all():
+            file.delete()
+        directory.delete()
+        dropfile_env_quick_update() # not background
+        
+        return Response({'status':'ok'})
+    
+    '''
+    directory create overwrite
+    '''
+    @csrf_exempt
+    def create(self,request):
+        queries = request.POST
+        new_path = queries['path'].rstrip('/')
+        parent_path = "/".join(new_path.split('/')[:-1])
+        try:
+            parent = None if parent_path=='/storage' \
+                        else Directory.objects.filter(path=parent_path).all()[0]
+        except:
+            return Response({'status':'no'})
+        
+        new_dir = Directory(parent=parent,path=new_path)
+        os.makedirs(new_path,exist_ok=True)
+        new_dir.save()
+        return Response({'status':'ok'})
+
+
+    '''
+    directory move
+    '''
+    @action(methods=['get'], detail=True, url_path='move', url_name='move')
+    def dir_move(self,request,pk=None):
+        queries = request.GET
+        dirobj = self.get_object()
+        new_path = queries['path'].rstrip('/')
+        old_path = dirobj.path
+
+        # dirobj query
+        try:
+            target_dirobj = Directory.objects.filter(new_path=new_path).all()[0]
+        except:
+            return Response({'status':'no'})
+        
+        # storage change
+        shutil.copytree(old_path,new_path)
+        for file in dirobj.file_set.all():
+            file.directory = target_dirobj
+            file.path = target_dirobj.path+'/'+file.name
+            file.save()
+        
+        dropfile_env_quick_update() # not background
+        
+        return Response({'status':'ok'})
+
+
+    
 class FileViewSet(viewsets.ModelViewSet):
     queryset = File.objects.all()
     serializer_class = FileSerializer
+    
+    '''
+    file list overwrite
+    '''
+    def list(self,request):
+        queryset = File.objects.filter(is_post=True).all()
+        serializer = self.get_serializer(queryset,many=True)
+        return Response(serializer.data)
 
+    '''
+    file delete overwrite
+    '''
+    def destroy(self,request,pk=None):
+        file = self.get_object()
+        path = file.path
+        shutil.rmtree(path)
+        file.delete()
+        dropfile_env_update(0)
+        dropfile_env_update_helper(0)
+        return Response({'status':'ok'})
 
-'''
-file upload and recommend path
-'''
-def file_post(request):
-    if request.method=='POST':
+    '''
+    file upload and recommend path
+    '''
+    @action(methods=['post'], detail=False, url_path='pre-upload', url_name='pre-upload')
+    @csrf_exempt
+    def file_post(self,request):
         files = request.FILES
         fs = FileSystemStorage()
         if (len(files)!=1):
@@ -56,7 +145,7 @@ def file_post(request):
         for key in files:
             fileobj = files[key]
             fname = fileobj.name
-            fpath = TMP_DIR+'/{}.pdf'.format(secrets.token_hex(16))
+            fpath = DATA_DIR+'/{}.pdf'.format(secrets.token_hex(16))
             fs.save(fpath,fileobj)
         
         # load DTM matrix
@@ -78,74 +167,85 @@ def file_post(request):
         syndict = None
         if os.path.exists(SYNDICT_path):
             with open(SYNDICT_path,'rb') as f:
-                flst = pickle.load(f)
+                syndict = pickle.load(f)
         
         new_dir_path,_,_ = dropfile.dropfile(fpath,STORAGE_DIR,DTM,vocab,syndict,flst)
-        # empty tasks. 
-        # This web application is for single person, therfore only consider case that no multi-access occur
-        Tasks.objects.all().delete() 
-        # background task
-        dropfile_env_update(fpath,os.path.join(new_dir_path,fname)) # add new task
-        
-        result = dict()
-        result['path'] = fpath
-        response = HttpResponse(json.dumps(result), content_type=u"application/json; charset=utf-8")
-        add_access_control_headers(response)
-        return response
-    else:
-        result = dict()
-        result['path'] = None
-        response = HttpResponse(json.dumps(result), content_type=u"application/json; charset=utf-8")
-        add_access_control_headers(response)
-        return response
-
-
-'''
-set upload path and upload
-'''
-def file_post_accept(request):
-    if request.method=='GET':
-        queries = request.GET
-        file_path = queries['path']
-        
-        # execute background task
-        os.system("nohup python manage.py process_tasks --queue=update_queue &")
-        name = file_path.split('/')[-1]
-        
-        # parse directory
-        dir_path = file_path.split('/')[:-1]
-        directory = Directory.objects.filter(path=dir_path)
         
         # add to DB
-        new_file = File(name=name,path=file_path,directory=directory)
+        new_file = File(name=fname,path=fpath)
         new_file.save()
         
+        # background task
+        dropfile_env_update(new_file.pk)
+        dropfile_env_update_helper(new_file.pk) # add new task
+        
         result = dict()
-        result['flag'] = True
+        result['pk'] = new_file.pk
+        result['name'] = new_file.name
+        result['new_dir_path'] = new_dir_path
         response = HttpResponse(json.dumps(result), content_type=u"application/json; charset=utf-8")
         add_access_control_headers(response)
         return response
-    else:
-        result = dict()
-        result['flag'] = False
-        response = HttpResponse(json.dumps(result), content_type=u"application/json; charset=utf-8")
-        add_access_control_headers(response)
-        return response
-    
-    
-'''
-delete file
-'''
-def file_delete(request):
-    return
-    
 
 
-'''
-move file
-'''
-def file_move(request):
-    return
+    '''
+    set upload path and upload
+    '''
+    @action(methods=['get'], detail=True, url_path='accept-upload', url_name='accept-upload')
+    def file_post_accept(self,request,pk=None):
+        queries = request.GET
+        fileobj = self.get_object()
+        new_dir_path = queries['new_dir_path'].rstrip('/')
+        old_path = fileobj.path
+        if not os.path.isdir(str(new_dir_path)):
+            return Response({'status':'no'})
+        new_path = os.path.join(new_dir_path,fileobj.name)
+        try:
+            dirobj = Directory.objects.filter(path=new_dir_path).all()[0]
+        except:
+            return Response({'status':'no'})
+        
+        # update info
+        shutil.move(old_path,new_path)
+        fileobj.directory = dirobj
+        fileobj.path = new_path
+        fileobj.is_post = True
+        fileobj.save()
+        
+        # execute background task - DTM building and preprocessing
+        os.system("nohup python manage.py process_tasks --queue=update-queue-{} &".format(pk))
+        
+        return Response({'status':'ok'})
+
+    '''
+    move file to another directory
+    '''
+    @action(methods=['get'], detail=True, url_path='move', url_name='move')
+    def file_move(self,request,pk=None):
+        queries = request.GET
+        fileobj = self.get_object()
+        if fileobj.is_post:
+            dir_path = queries['new_dir_path']
+            new_path = os.path.join(dir_path,fileobj.name)
+            try:
+                dirobj = Directory.objects.filter(path=dir_path).all()[0]
+            except:
+                return Response({'status':'no'})
+            shutil.move(fileobj.path,new_path)
+            fileobj.path = new_path
+            fileobj.directory = dirobj
+            fileobj.save()
+            
+            dropfile_env_update(fileobj.pk)
+            dropfile_env_update_helper(fileobj.pk) # add new task
+            
+            # execute background task - DTM building and preprocessing
+            os.system("nohup python manage.py process_tasks --queue=update-queue-{} &".format(fileobj.pk))
+        
+            return Response({'status':'ok'})
+        else:
+            return Response({'status':'no'})
+
 
 
 '''
@@ -154,16 +254,4 @@ file and directory hierarchy show
 def dir_hierarchy_show(request):
     return
     
-    
-'''
-file and directory hierarchy show
-'''
-def dir_delete(request):
-    return
-
-'''
-file and directory hierarchy show
-'''
-def dir_create(request):
-    return
     
