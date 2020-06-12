@@ -17,7 +17,7 @@ import shutil
 
 from . import add_access_control_headers
 from .models import Directory, File
-from .serializers import UserSerializer, DirectorySerializer, FileSerializer
+from .serializers import UserSerializer, DirectorySerializer, FileSerializer, HierarchySerializer
 from .dropFile import dropfile
 from .tasks import dropfile_env_update_helper,dropfile_env_quick_update,dropfile_env_update
 
@@ -62,6 +62,7 @@ class DirectoryViewSet(viewsets.ModelViewSet):
     def create(self,request):
         queries = request.POST
         new_path = queries['path'].rstrip('/')
+        name = new_path.split('/')[-1]
         parent_path = "/".join(new_path.split('/')[:-1])
         try:
             parent = None if parent_path=='/storage' \
@@ -69,7 +70,7 @@ class DirectoryViewSet(viewsets.ModelViewSet):
         except:
             return Response({'status':'no'})
         
-        new_dir = Directory(parent=parent,path=new_path)
+        new_dir = Directory(parent=parent,path=new_path,name=name)
         os.makedirs(new_path,exist_ok=True)
         new_dir.save()
         return Response({'status':'ok'})
@@ -252,6 +253,13 @@ class FileViewSet(viewsets.ModelViewSet):
 file and directory hierarchy show
 '''
 def dir_hierarchy_show(request):
-    return
-    
-    
+    if request.method == 'GET':
+        queryset = Directory.objects.filter(parent=None).all()
+        serializer = HierarchySerializer(queryset,many=True)
+        response = HttpResponse(json.dumps(serializer.data), content_type=u"application/json; charset=utf-8")
+        add_access_control_headers(response)
+        return response
+    else:
+        response = HttpResponse({'status':'no'}, content_type=u"application/json; charset=utf-8")
+        add_access_control_headers(response)
+        return response

@@ -13,5 +13,5 @@ router.register(r'files', FileViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('show', dir_hierarchy_show),
+    path('show/', dir_hierarchy_show),
 ]
