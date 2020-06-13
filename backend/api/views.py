@@ -211,7 +211,10 @@ class FileViewSet(viewsets.ModelViewSet):
         fileobj.directory = dirobj
         fileobj.path = new_path
         fileobj.is_post = True
-        fileobj.save()
+        try:
+            fileobj.save()
+        except:
+            return Response({'status':'no'})
         
         # execute background task - DTM building and preprocessing
         os.system("nohup python manage.py process_tasks --queue=update-queue-{} &".format(pk))
