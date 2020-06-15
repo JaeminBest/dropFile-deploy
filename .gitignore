@@ -28,5 +28,5 @@ backend/api/migrations/*
 data
 storage
 *.out
-.env
+*.env
 package-lock.json

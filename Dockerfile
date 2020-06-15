@@ -9,7 +9,7 @@ RUN pip install -r requirements.txt
 RUN git clone https://github.com/arteria/django-background-tasks.git \
     && cd django-background-tasks && pip install -r requirements.txt && python setup.py install
 RUN python -c "import nltk; nltk.download('brown'); nltk.download('stopwords'); nltk.download('punkt'); nltk.download('wordnet'); nltk.download('averaged_perceptron_tagger')"
-RUN python -m spacy download en_core_web_sm
+RUN python -m spacy download en_core_web_lg
 
 # node docker environment
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
