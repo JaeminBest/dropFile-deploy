@@ -5,7 +5,7 @@ import os
 import pickle
 
 from . import *
-from .dropFile import preprocessing
+from .dropFile import dropfile
 from .models import *
 
 DTM_pickle = '/home/data/dtm.pkl'
@@ -23,27 +23,7 @@ def dropfile_env_update_helper(pk):
 
 @background(queue='update-queue')
 def dropfile_env_update(pk):
-    # build new DTM and vocab
-    # preprocessing : lookup hierarchy of root path
-    directory_dict = defaultdict(list) # empty dictionary for lookup_directory function
-    dir_hierarchy = preprocessing.lookup_directory('/storage', directory_dict) # change it to have 2 parameter
-
-    file_list = list()
-    dir_list = list()
-    label_num = 0
-    for tar_dir in dir_hierarchy:
-        file_list += dir_hierarchy[tar_dir]
-        dir_list.append(tar_dir)
-        label_num += 1
-        
-    # preprocessing : build vocabulary from file_list
-    doc_list = list()
-    for file in file_list:
-        doc_list.append(preprocessing.file2tok(file))
-    vocab, synonym_dict = preprocessing.build_vocab(doc_list)
-    
-    # preprocessing : build DTM of files under root_path
-    DTM = preprocessing.build_DTM(doc_list, vocab, synonym_dict)
+    DTM, vocab, synonym_dict = dropfile.prepare_env('/storage')
     
     with open(DTM_pickle,'wb') as f:
         pickle.dump(DTM,f)
@@ -53,9 +33,7 @@ def dropfile_env_update(pk):
         
     with open(vocab_pickle,'wb') as f:
         pickle.dump(vocab,f)
-        
-    with open(filelist_pickle,'wb') as f:
-        pickle.dump(file_list,f)
+    
     
     if pk!=0:
         Task.objects.filter(queue='update-queue-{}'.format(pk)).delete() #clear queue
@@ -64,27 +42,7 @@ def dropfile_env_update(pk):
 
 
 def dropfile_env_quick_update():
-    # build new DTM and vocab
-    # preprocessing : lookup hierarchy of root path
-    directory_dict = defaultdict(list) # empty dictionary for lookup_directory function
-    dir_hierarchy = preprocessing.lookup_directory('/storage', directory_dict) # change it to have 2 parameter
-
-    file_list = list()
-    dir_list = list()
-    label_num = 0
-    for tar_dir in dir_hierarchy:
-        file_list += dir_hierarchy[tar_dir]
-        dir_list.append(tar_dir)
-        label_num += 1
-        
-    # preprocessing : build vocabulary from file_list
-    doc_list = list()
-    for file in file_list:
-        doc_list.append(preprocessing.file2tok(file))
-    vocab, synonym_dict = preprocessing.build_vocab(doc_list)
-    
-    # preprocessing : build DTM of files under root_path
-    DTM = preprocessing.build_DTM(doc_list, vocab, synonym_dict)
+    DTM, vocab, synonym_dict = dropfile.prepare_env('/storage')
     
     with open(DTM_pickle,'wb') as f:
         pickle.dump(DTM,f)
@@ -94,6 +52,4 @@ def dropfile_env_quick_update():
         
     with open(vocab_pickle,'wb') as f:
         pickle.dump(vocab,f)
-        
-    with open(filelist_pickle,'wb') as f:
-        pickle.dump(file_list,f)
+    

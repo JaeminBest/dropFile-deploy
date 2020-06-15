@@ -123,7 +123,7 @@ class FileViewSet(viewsets.ModelViewSet):
     def destroy(self,request,pk=None):
         file = self.get_object()
         path = file.path
-        shutil.rmtree(path)
+        os.remove(path)
         file.delete()
         dropfile_env_update(0)
         dropfile_env_update_helper(0)
@@ -159,18 +159,13 @@ class FileViewSet(viewsets.ModelViewSet):
         if os.path.exists(VOCAB_path):
             with open(VOCAB_path,'rb') as f:
                 vocab = pickle.load(f)
-        # load file list
-        flst = None
-        if os.path.exists(FLST_path):
-            with open(FLST_path,'rb') as f:
-                flst = pickle.load(f)
         # load syndict
         syndict = None
         if os.path.exists(SYNDICT_path):
             with open(SYNDICT_path,'rb') as f:
                 syndict = pickle.load(f)
         
-        new_dir_path,_,_ = dropfile.dropfile(fpath,STORAGE_DIR,DTM,vocab,syndict,flst)
+        new_dir_path,_,_ = dropfile.dropfile(fpath,STORAGE_DIR,cached_DTM=DTM,cached_vocab=vocab,cached_synonym_dict=syndict)
         
         # add to DB
         new_file = File(name=fname,path=fpath)
@@ -235,7 +230,10 @@ class FileViewSet(viewsets.ModelViewSet):
                 dirobj = Directory.objects.filter(path=dir_path).all()[0]
             except:
                 return Response({'status':'no'})
-            shutil.move(fileobj.path,new_path)
+            try:
+                shutil.move(fileobj.path,new_path)
+            except:
+                return Response({'status':'no'})
             fileobj.path = new_path
             fileobj.directory = dirobj
             fileobj.save()
