@@ -8,6 +8,7 @@ from django.core.files.storage import FileSystemStorage
 from django.views.decorators.csrf import csrf_exempt
 
 from django.shortcuts import get_object_or_404
+from background_task.models import Task
 
 import secrets
 import os
@@ -21,8 +22,8 @@ from .serializers import UserSerializer, DirectorySerializer, FileSerializer, Hi
 from .dropFile import dropfile
 from .tasks import dropfile_env_update_helper,dropfile_env_quick_update,dropfile_env_update
 
-DATA_DIR = '/home/data'
-STORAGE_DIR = '/storage'
+DATA_DIR = os.environ['PICKLE_DIR']
+STORAGE_DIR = os.environ['STORAGE_DIR']
 DTM_path = os.path.join(DATA_DIR,'dtm.pkl')
 VOCAB_path = os.path.join(DATA_DIR,'vocab.pkl')
 FLST_path = os.path.join(DATA_DIR,'filelist.pkl')
@@ -47,7 +48,7 @@ class DirectoryViewSet(viewsets.ModelViewSet):
     def destroy(self,request,pk=None):
         directory = self.get_object()
         path = directory.path
-        shutil.rmtree(path)
+        shutil.rmtree(path.replace(STORAGE_DIR,'/storage'))
         for file in directory.file_set.all():
             file.delete()
         directory.delete()
@@ -65,13 +66,13 @@ class DirectoryViewSet(viewsets.ModelViewSet):
         name = new_path.split('/')[-1]
         parent_path = "/".join(new_path.split('/')[:-1])
         try:
-            parent = None if parent_path=='/storage' \
+            parent = None if parent_path == STORAGE_DIR \
                         else Directory.objects.filter(path=parent_path).all()[0]
         except:
             return Response({'status':'no'})
         
         new_dir = Directory(parent=parent,path=new_path,name=name)
-        os.makedirs(new_path,exist_ok=True)
+        os.makedirs(new_path.replace(STORAGE_DIR,'/storage'),exist_ok=True)
         new_dir.save()
         return Response({'status':'ok'})
 
@@ -83,8 +84,8 @@ class DirectoryViewSet(viewsets.ModelViewSet):
     def dir_move(self,request,pk=None):
         queries = request.GET
         dirobj = self.get_object()
-        new_path = queries['path'].rstrip('/')
-        old_path = dirobj.path
+        new_path = queries['path'].rstrip('/').strip()
+        old_path = dirobj.path.replace(STORAGE_DIR,'/storage')
 
         # dirobj query
         try:
@@ -93,7 +94,7 @@ class DirectoryViewSet(viewsets.ModelViewSet):
             return Response({'status':'no'})
         
         # storage change
-        shutil.copytree(old_path,new_path)
+        shutil.copytree(old_path,new_path.replace(STORAGE_DIR,'/storage'))
         for file in dirobj.file_set.all():
             file.directory = target_dirobj
             file.path = target_dirobj.path+'/'+file.name
@@ -122,7 +123,7 @@ class FileViewSet(viewsets.ModelViewSet):
     '''
     def destroy(self,request,pk=None):
         file = self.get_object()
-        path = file.path
+        path = file.path.replace(STORAGE_DIR,'/storage')
         os.remove(path)
         file.delete()
         dropfile_env_update(0)
@@ -165,7 +166,7 @@ class FileViewSet(viewsets.ModelViewSet):
             with open(SYNDICT_path,'rb') as f:
                 syndict = pickle.load(f)
         
-        new_dir_path,_,_ = dropfile.dropfile(fpath,STORAGE_DIR,cached_DTM=DTM,cached_vocab=vocab,cached_synonym_dict=syndict)
+        new_dir_path,_,_,_ = dropfile.dropfile(fpath,'/storage',DTM,vocab,syndict,verbose=False)
         
         # add to DB
         new_file = File(name=fname,path=fpath)
@@ -178,7 +179,7 @@ class FileViewSet(viewsets.ModelViewSet):
         result = dict()
         result['pk'] = new_file.pk
         result['name'] = new_file.name
-        result['new_dir_path'] = new_dir_path
+        result['new_dir_path'] = new_dir_path.replace('/storage',STORAGE_DIR)
         response = HttpResponse(json.dumps(result), content_type=u"application/json; charset=utf-8")
         add_access_control_headers(response)
         return response
@@ -190,7 +191,9 @@ class FileViewSet(viewsets.ModelViewSet):
     @action(methods=['get'], detail=True, url_path='accept-upload', url_name='accept-upload')
     def file_post_accept(self,request,pk=None):
         queries = request.GET
-        fileobj = self.get_object()
+        fileobj = File.objects.get(pk)
+        if fileobj is None:
+            return Response({'status':'no'})
         new_dir_path = queries['new_dir_path'].rstrip('/')
         old_path = fileobj.path
         if not os.path.isdir(str(new_dir_path)):
@@ -202,7 +205,7 @@ class FileViewSet(viewsets.ModelViewSet):
             return Response({'status':'no'})
         
         # update info
-        shutil.move(old_path,new_path)
+        shutil.move(old_path.replace(STORAGE_DIR,'/storage'),new_path.replace(STORAGE_DIR,'/storage'))
         fileobj.directory = dirobj
         fileobj.path = new_path
         fileobj.is_post = True
@@ -222,28 +225,24 @@ class FileViewSet(viewsets.ModelViewSet):
     @action(methods=['get'], detail=True, url_path='move', url_name='move')
     def file_move(self,request,pk=None):
         queries = request.GET
-        fileobj = self.get_object()
+        fileobj = File.objects.get(pk)
+        if fileobj is None:
+            return Response({'status':'no'})
         if fileobj.is_post:
             dir_path = queries['new_dir_path']
-            new_path = os.path.join(dir_path,fileobj.name)
+            new_path = os.path.join(dir_path.replace(STORAGE_DIR,'/storage'),fileobj.name)
             try:
                 dirobj = Directory.objects.filter(path=dir_path).all()[0]
             except:
                 return Response({'status':'no'})
             try:
-                shutil.move(fileobj.path,new_path)
+                shutil.move(fileobj.path.replace(STORAGE_DIR,'/storage'),new_path)
             except:
                 return Response({'status':'no'})
             fileobj.path = new_path
             fileobj.directory = dirobj
             fileobj.save()
             
-            dropfile_env_update(fileobj.pk)
-            dropfile_env_update_helper(fileobj.pk) # add new task
-            
-            # execute background task - DTM building and preprocessing
-            os.system("nohup python manage.py process_tasks --queue=update-queue-{} &".format(fileobj.pk))
-        
             return Response({'status':'ok'})
         else:
             return Response({'status':'no'})

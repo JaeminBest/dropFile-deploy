@@ -69,7 +69,7 @@
             <v-row align="start" justify="center">
               <v-col lg="10" md="10" xs="10">
                 <v-card height="700px">
-                  <dirroot v-if="!loading" v-bind:items="items"/>
+                  <dirroot v-if="!loading" v-bind:items="items" v-bind:fetchFlag="fetchFlag"/>
                   <v-overlay
                     :absolute="true"
                     :value="overlay"
@@ -96,17 +96,28 @@
               </v-row>
               <v-row align="start" justify="center" v-else>
                 <v-col lg="10" md="10" xs="10">
-                  <h4> 해당 디렉토리에 저장하시겠습니까? </h4>
+                  <div v-if="msg2.length!=0">
+                    {{msg2}}
+                  </div>
+                  <div v-else>
+                    <h4> 해당 디렉토리에 저장하시겠습니까? </h4>
+                  </div>
                 </v-col>
                 <v-col lg="9" md="9" xs="9">
                   <v-text-field
                     label="저장될 디렉토리 경로"
-                    :readonly="!loading2"
+                    :readonly="loading3"
+                    placeholder="추천 디렉토리 경로가 없습니다"
                     v-model="new_dir_path"
                   ></v-text-field>
                 </v-col>
                 <v-col lg="1" md="1" xs="1">
-                  <v-btn v-if="!loading2" color="indigo" dark @click="accept()">ACCEPT</v-btn>
+                  <v-btn v-if="msg2.length!=0" color="indigo" dark @click="msg2=''">돌아가기</v-btn>
+                  <v-btn v-else-if="!loading3" 
+                    color="indigo" 
+                    dark @click="accept()">
+                    ACCEPT
+                  </v-btn>
                   <v-progress-circular v-else color="indigo" indeterminate/>
                 </v-col>
               </v-row>
@@ -148,6 +159,7 @@
       status: false,
       pk: "",
       msg1: "",
+      msg2: "",
       dirPath: "",
       loading1: false,
       loading2: false,
@@ -157,9 +169,18 @@
       dialog1: false,
       overlay: false,
       lock1: false,
+      fetchFlag: false,
     }),
     created: function() {
       this.fetch()
+    },
+    watch: {
+      fetchFlag: function(oldVal, newVal) {
+        if (newVal==true) {
+          this.fetch();
+          oldVal = false;
+        }
+      }
     },
     methods: {
       fetch() {
@@ -208,11 +229,11 @@
                 }.bind(this)
               })
               .then(res => {
-                const data = lodash.cloneDeep(res.data);
+                this.data = lodash.cloneDeep(res.data);
                 setTimeout(() => {
                   that.loading2 = false;
                   that.btn2 = true;
-                  that.new_dir_path = data.new_dir_path;
+                  this.new_dir_path = this.data.new_dir_path;
                 }, 2000);
               });
           } catch (error) {
@@ -225,26 +246,34 @@
       },
       accept() {
         var that = this;
-        that.loading2 = true;
+        that.loading3 = true;
         return new Promise((resolve, reject) => {
           try {
             this.$http
               .get(`/api/files/${this.data.pk}/accept-upload/?new_dir_path=${this.new_dir_path}`)
               .then(response => {
-                this.status = (response.status=='no') ? false: true;
+                if (response.data.status=='no') {
+                  setTimeout(() => {
+                    that.loading3 = false;
+                    that.lock2 = false;
+                    this.msg2 = "파일 업로드에 실패했습니다. 이미 존재하는 디렉토리의 하위 경로로 입력해주세요.";
+                  }, 2000);
+                  throw "file upload error";
+                }
                 this.pk = response.data.pk;
               })
               .then(() => {
                 setTimeout(() => {
-                  that.loading2 = false;
+                  that.loading3 = false;
                   that.file = undefined;
                   that.new_dir_path = '';
+                  this.msg2 = "파일 업로드에 성공했습니다. 더 업로드하고 싶다면 '돌아가기' 버튼을 눌러주세요";
                 }, 2000);
                 this.fetch();
               });
           } catch (error) {
             setTimeout(() => {
-              that.loading2 = false;
+              that.loading3 = false;
               that.new_dir_path = "";
               that.file = undefined;
             }, 2000);

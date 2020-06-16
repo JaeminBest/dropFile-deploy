@@ -2,10 +2,6 @@ import os
 
 ALLOW_ALL = "*"
 
-DATA_DIR = '/home/data'
-os.makedirs(DATA_DIR,exist_ok=True)
-
-
 def add_access_control_headers(response):
   response["Access-Control-Allow-Origin"] = ALLOW_ALL
   response["Access-Control-Allow-Methods"] = ALLOW_ALL
