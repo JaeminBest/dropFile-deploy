@@ -23,10 +23,10 @@ function repo_unpack() {
       docker-compose build
     fi
     echo ""
-    echo "================== SETTING DONE =================="
-    echo "| now start your first dropFile web application! |"
-    echo "| COMMAND : ROOT=[ROOT] dropFile start           |" 
-    echo "=================================================="
+    echo "================== SETTING DONE ========================="
+    echo "| now start your first dropFile web application!        |"
+    echo "| COMMAND : ROOT=[ROOT] [WATCH=[WATCH]] dropFile start  |" 
+    echo "========================================================="
     echo ""
   fi
 }

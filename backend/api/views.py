@@ -18,6 +18,7 @@ import shutil
 
 from . import add_access_control_headers
 from .models import Directory, File
+from .utils import update_filelist
 from .serializers import UserSerializer, DirectorySerializer, FileSerializer, HierarchySerializer
 from .dropFile import dropfile
 from .tasks import dropfile_env_update_helper,dropfile_env_quick_update,dropfile_env_update
@@ -49,7 +50,7 @@ class DirectoryViewSet(viewsets.ModelViewSet):
         directory = self.get_object()
         path = directory.path
         shutil.rmtree(path.replace(STORAGE_DIR,'/storage'))
-        for file in directory.file_set.all():
+        for file in directory.files.all():
             file.delete()
         directory.delete()
         dropfile_env_quick_update() # not background
@@ -205,12 +206,15 @@ class FileViewSet(viewsets.ModelViewSet):
             return Response({'status':'no'})
         
         # update info
-        shutil.move(old_path.replace(STORAGE_DIR,'/storage'),new_path.replace(STORAGE_DIR,'/storage'))
         fileobj.directory = dirobj
         fileobj.path = new_path
         fileobj.is_post = True
+        fileobj.temp_path = None
         try:
             fileobj.save()
+            shutil.move(old_path.replace(STORAGE_DIR,'/storage'),new_path.replace(STORAGE_DIR,'/storage'))
+            if os.environ.get('WATCH'):
+                update_filelist()
         except:
             return Response({'status':'no'})
         
@@ -255,8 +259,29 @@ file and directory hierarchy show
 def dir_hierarchy_show(request):
     if request.method == 'GET':
         queryset = Directory.objects.filter(parent=None).all()
+        result = dict()
         serializer = HierarchySerializer(queryset,many=True)
-        response = HttpResponse(json.dumps(serializer.data), content_type=u"application/json; charset=utf-8")
+        result['items'] = serializer.data
+        result['parent_path'] = os.environ['ROOT']
+        response = HttpResponse(json.dumps(result), content_type=u"application/json; charset=utf-8")
+        add_access_control_headers(response)
+        return response
+    else:
+        response = HttpResponse({'status':'no'}, content_type=u"application/json; charset=utf-8")
+        add_access_control_headers(response)
+        return response
+
+'''
+file and directory hierarchy show
+'''
+def dropfile_queue_show(request):
+    if request.method == 'GET':
+        queryset = File.objects.filter(is_post=False).all()
+        result = dict()
+        serializer = FileSerializer(queryset,many=True)
+        result['items'] = serializer.data
+        result['parent_path'] = os.environ['WATCH']
+        response = HttpResponse(json.dumps(result), content_type=u"application/json; charset=utf-8")
         add_access_control_headers(response)
         return response
     else:

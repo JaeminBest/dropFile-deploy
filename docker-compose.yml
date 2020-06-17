@@ -1,41 +1,19 @@
-version: '3.8'
+version: '3.0'
 
 services:
-  back:
-    build:
-      context: .
-      dockerfile: Dockerfile_back
-    networks: 
-      - dropfile-network
-    ports:
-      - "2300:2300"
-    environment: 
-      - ROOT=$ROOT
-    env_file:
-      - ./.env
-    restart: "always"
-    volumes:
-      - .:/home
-      - $ROOT:/storage
-  front:
-    build:
-      context: .
-      dockerfile: Dockerfile_front
-    networks: 
-      - dropfile-network
+  web:
+    build: .
     ports:
       - "8080:8080"
+      - "80:80"
       - "8000:8000"
-    links:
-      - "back"
     environment: 
       - ROOT=$ROOT
+      # - WATCH=$WATCH
     env_file:
       - ./.env
     restart: "always"
     volumes:
       - .:/home
       - $ROOT:/storage
-
-networks:
-  dropfile-network: {}
+      # - $WATCH:/watch

@@ -15,5 +15,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")
 
 application = get_wsgi_application()
 
-from .api import default_db_update
+from .api.utils import default_db_update
+from .api.tasks import dropfile_watcher
 default_db_update()
+# dropfile_watcher()

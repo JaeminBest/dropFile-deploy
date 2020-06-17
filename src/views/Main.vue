@@ -22,7 +22,7 @@
             <h2> Content-based Lecture File Path auto-recommendation System </h2>
             <h3> CS372 NLP course Term Project </h3>
             <v-row align="start" justify="center">
-              <v-col lg="9" md="9" xs="9"> <v-spacer/> </v-col>
+              <v-col lg="9" md="7" xs="7"> <v-spacer/> </v-col>
               <v-col lg="3" md="3" xs="3">
                 <v-dialog v-model="dialog1" persistent max-width="700">
                   <template v-slot:activator="{ on, attrs }">
@@ -31,9 +31,9 @@
                       dark
                       v-bind="attrs"
                       v-on="on"
+                      @click="dirPath=parentPath"
                     >
                       New Directory
-                      <v-icon dark right>mdi-create-new-folder</v-icon>
                     </v-btn>
                   </template>
                   <v-card>
@@ -42,6 +42,7 @@
                       <v-row justify="center">
                         <v-text-field
                           v-model="dirPath"
+                          hint="path should start with ROOT PATH"
                           :disabled="lock1"
                         ></v-text-field>
                       </v-row>
@@ -54,8 +55,8 @@
                     </v-card-text>
                     <v-card-actions v-if="!btn1">
                       <v-spacer></v-spacer>
-                      <v-btn color="indigo" text @click="dialog1 = false; msg1=''">만들지 않을래요</v-btn>
-                      <v-btn color="indigo" text :disabled="dirPath.length==0" @click="createDirectory(dirPath); dirPath=''">이걸로 만들게요</v-btn>
+                      <v-btn color="indigo" text :disabled="loading1" @click="dialog1 = false; msg1=''">만들지 않을래요</v-btn>
+                      <v-btn color="indigo" text :disabled="dirPath.length==0 || loading1" @click="createDirectory(dirPath); dirPath=''">이걸로 만들게요</v-btn>
                     </v-card-actions>
                     <v-card-actions v-else>
                       <v-spacer></v-spacer>
@@ -64,12 +65,24 @@
                   </v-card>
                 </v-dialog>
               </v-col>
+              <v-col lg="2" md="2" xs="2">
+                <v-btn
+                  color="indigo"
+                  dark
+                  @click="fetch()"
+                >
+                  <v-icon>mdi-refresh</v-icon>
+                </v-btn>
+              </v-col>
               <v-spacer/>
             </v-row>
             <v-row align="start" justify="center">
               <v-col lg="10" md="10" xs="10">
                 <v-card height="700px">
-                  <dirroot v-if="!loading" v-bind:items="items" v-bind:fetchFlag="fetchFlag"/>
+                  <dirroot v-if="!loading"
+                    v-bind:items="items" 
+                    v-bind:parentPath="parentPath"
+                    :isparent="true"/>
                   <v-overlay
                     :absolute="true"
                     :value="overlay"
@@ -137,6 +150,7 @@
 
 <script>
   import DirectoryRoot from '@/components/DirectoryRoot.vue'
+  import { mapMutations, mapGetters } from 'vuex'
   const lodash = require("lodash")
 
   export default {
@@ -169,20 +183,28 @@
       dialog1: false,
       overlay: false,
       lock1: false,
-      fetchFlag: false,
+      parentPath: "",
     }),
     created: function() {
-      this.fetch()
+      this.fetch();
+    },
+    computed: {
+      ...mapGetters('fetch', ['fetchFlag']),
     },
     watch: {
-      fetchFlag: function(oldVal, newVal) {
-        if (newVal==true) {
-          this.fetch();
-          oldVal = false;
+      fetchFlag: function(a,b) {
+        if (a && !b) {
+          setTimeout(() => {
+            this.fetch();
+            this.switchOff();
+          }, 2000);
         }
       }
     },
     methods: {
+      ...mapMutations('fetch',[
+        'switchOff'
+      ]),
       fetch() {
         var that = this;
         that.loading = true;
@@ -193,12 +215,14 @@
             this.$http
               .get(`/api/show/`)
               .then(response => {
-                this.items = lodash.cloneDeep(response.data);
+                this.items = lodash.cloneDeep(response.data.items);
+                this.parentPath = response.data.parent_path;
               })
               .then(() => {
                 setTimeout(() => {
                   that.loading = false;
                   that.overlay = false;
+                  this.switchOff();
                 }, 2000);
               });
           } catch (error) {
@@ -301,6 +325,7 @@
                     that.loading1 = false;
                     that.lock1 = false;
                     this.msg1 = "디렉토리 생성에 실패했습니다. 이미 존재하는 디렉토리의 하위 경로로 입력해주세요.";
+                    this.dirPath = this.parentPath;
                   }, 2000);
                   throw "create directory error";
               }})
@@ -316,6 +341,9 @@
             
           }
         });
+      },
+      track() {
+        
       }
     }
   }

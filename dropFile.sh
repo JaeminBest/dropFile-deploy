@@ -1,17 +1,18 @@
 #!/bin/bash
 SERVICE_NAME=dropFile-docker-manager
-CONTAINER=dropfile-deploy_back_1
-CONTAINER_FRONT=dropfile-deploy_front_1
+CONTAINER=dropfile-deploy_web_1 # Make this value to yours.
 
 case "$1" in
   start)
     export ROOT="$(cd "$(dirname "$ROOT")"; pwd)/$(basename "$ROOT")"
-    echo "starting your dropfile-deploy system in '$ROOT'..."
+    # export WATCH="$(cd "$(dirname "$WATCH")"; pwd)/$(basename "$WATCH")"
+    echo "[ ROOT  ] starting your dropfile-deploy system in '$ROOT'..."
+    # echo "[ WATCH ] watching your download default directory '$WATCH'..."
     docker-compose up -d
-    docker start $CONTAINER $CONTAINER_FRONT
+    docker start $CONTAINER
     ;;
   stop)
-    docker rm -f $CONTAINER $CONTAINER_FRONT
+    docker rm -f $CONTAINER
     ;;
   logs)
     docker logs -f $CONTAINER
@@ -32,8 +33,8 @@ case "$1" in
     fi
     ;;
   delete)
-    docker-compose rm -f $CONTAINER $CONTAINER_FRONT
-    docker-compose image rm -f dropfile-deploy_back dropfile-deploy_front
+    docker-compose rm -f $CONTAINER
+    docker-compose image rm -f dropfile-deploy_web
     ;;
   bash)
     docker exec -it $CONTAINER bash
