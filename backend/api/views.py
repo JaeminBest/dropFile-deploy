@@ -127,8 +127,8 @@ class FileViewSet(viewsets.ModelViewSet):
         path = file.path.replace(STORAGE_DIR,'/storage')
         os.remove(path)
         file.delete()
-        dropfile_env_update(0)
-        dropfile_env_update_helper(0)
+        dropfile_env_update("0")
+        dropfile_env_update_helper("0")
         return Response({'status':'ok'})
 
     '''
@@ -173,10 +173,6 @@ class FileViewSet(viewsets.ModelViewSet):
         new_file = File(name=fname,path=fpath)
         new_file.save()
         
-        # background task
-        dropfile_env_update(new_file.pk)
-        dropfile_env_update_helper(new_file.pk) # add new task
-        
         result = dict()
         result['pk'] = new_file.pk
         result['name'] = new_file.name
@@ -192,12 +188,12 @@ class FileViewSet(viewsets.ModelViewSet):
     @action(methods=['get'], detail=True, url_path='accept-upload', url_name='accept-upload')
     def file_post_accept(self,request,pk=None):
         queries = request.GET
-        fileobj = File.objects.get(pk)
+        fileobj = self.get_object()
         if fileobj is None:
             return Response({'status':'no'})
         new_dir_path = queries['new_dir_path'].rstrip('/')
         old_path = fileobj.path
-        if not os.path.isdir(str(new_dir_path)):
+        if not os.path.isdir(str(new_dir_path.replace(STORAGE_DIR,'/storage'))):
             return Response({'status':'no'})
         new_path = os.path.join(new_dir_path,fileobj.name)
         try:
@@ -217,6 +213,9 @@ class FileViewSet(viewsets.ModelViewSet):
                 update_filelist()
         except:
             return Response({'status':'no'})
+        
+        dropfile_env_update(pk)
+        dropfile_env_update_helper(pk)
         
         # execute background task - DTM building and preprocessing
         os.system("nohup python manage.py process_tasks --queue=update-queue-{} &".format(pk))

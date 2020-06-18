@@ -16,7 +16,7 @@ syndict_pickle = '{}/syndict.pkl'.format(PICKLE_DIR)
 token_pickle = '{}/token.pkl'.format(PICKLE_DIR)
 watch_pickle = '{}/watch.pkl'.format(PICKLE_DIR)
 
-@background(queue='watcher-queue',repeat=20)
+@background(queue='watcher-queue')
 def dropfile_watcher():
     old_filelist = list()
     if os.path.exists(watch_pickle):
@@ -59,8 +59,8 @@ def dropfile_watcher():
 
 @background(queue='update-managing-queue')
 def dropfile_env_update_helper(pk):
-    task_params = str([[pk],{}])
-    target_task = Task.objects.filter(task_params=task_params).all()[0]
+    task_params = '[["{}"], {{}}]'.format(pk)
+    target_task = Task.objects.filter(task_name="backend.api.tasks.dropfile_env_update",task_params=task_params).all()[0]
     target_task.queue = 'update-queue-{}'.format(pk)
     target_task.save()
 

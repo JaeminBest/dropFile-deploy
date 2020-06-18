@@ -23,7 +23,7 @@
           <v-layout column justify-space-around>
             <v-flex lg12|md12
               v-for="item in items"
-              :key="item.name">
+              :key="item.pk">
               <v-card
                 :ripple="false"
                 @click="(v) => expand(item, v)">
@@ -137,7 +137,7 @@
                   </v-list-item>
                   <v-list-item
                     v-for="file in item.files"
-                    :key="file.name">
+                    :key="file.pk">
                     <v-icon>mdi-description</v-icon>
                     <h4>{{ file.name }}</h4>
                     <v-spacer/>
@@ -175,7 +175,7 @@
                           <v-btn 
                             color="indigo" 
                             text :disabled="new_dir_path.length==0 || loading2" 
-                            @click="moveFile(item.pk,new_dir_path); new_dir_path=''"
+                            @click="moveFile(file.pk,new_dir_path); new_dir_path=''"
                           >
                             여기로 옮길게요
                           </v-btn>
@@ -216,7 +216,7 @@
                         <v-card-actions v-if="!btn">
                           <v-spacer></v-spacer>
                           <v-btn color="indigo" text :disabled="loading3" @click="dialog3 = false; msg=''">아니요</v-btn>
-                          <v-btn color="indigo" text :disabled="loading3" @click="deleteFile(item.pk)">네</v-btn>
+                          <v-btn color="indigo" text :disabled="loading3" @click="deleteFile(file.pk)">네</v-btn>
                         </v-card-actions>
                         <v-card-actions v-else>
                           <v-spacer></v-spacer>

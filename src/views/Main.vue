@@ -19,11 +19,21 @@
         >
           <v-col class="text-center" align='start' justify="center">
             <h1>DropFile</h1>
-            <h2> Content-based Lecture File Path auto-recommendation System </h2>
+            <h2> Content-based PDF Document Path Auto-Recommendation System </h2>
             <h3> CS372 NLP course Term Project </h3>
             <v-row align="start" justify="center">
-              <v-col lg="9" md="7" xs="7"> <v-spacer/> </v-col>
-              <v-col lg="3" md="3" xs="3">
+              <!-- <v-col lg="2" md="2" xs="2"> 
+                <v-spacer/> 
+                <v-btn
+                  color="indigo"
+                  dark
+                  @click="fetch()"
+                >
+                  <v-icon>mdi-refresh</v-icon>
+                </v-btn>
+              </v-col> -->
+              <v-col lg="9" md="9" xs="9"> <v-spacer/> </v-col>
+              <v-col lg="2" md="2" xs="2">
                 <v-dialog v-model="dialog1" persistent max-width="700">
                   <template v-slot:activator="{ on, attrs }">
                     <v-btn
@@ -60,21 +70,11 @@
                     </v-card-actions>
                     <v-card-actions v-else>
                       <v-spacer></v-spacer>
-                      <v-btn color="indigo" text @click="dialog1 = false; btn1 = false; msg1=''; lock1 = false; fetch(); dirPath=''">돌아가기</v-btn>
+                      <v-btn color="indigo" text @click="dialog1 = false; btn1 = false; msg1=''; lock1 = false; dirPath=''">돌아가기</v-btn>
                     </v-card-actions>
                   </v-card>
                 </v-dialog>
               </v-col>
-              <v-col lg="2" md="2" xs="2">
-                <v-btn
-                  color="indigo"
-                  dark
-                  @click="fetch()"
-                >
-                  <v-icon>mdi-refresh</v-icon>
-                </v-btn>
-              </v-col>
-              <v-spacer/>
             </v-row>
             <v-row align="start" justify="center">
               <v-col lg="10" md="10" xs="10">
@@ -119,13 +119,13 @@
                 <v-col lg="9" md="9" xs="9">
                   <v-text-field
                     label="저장될 디렉토리 경로"
-                    :readonly="loading3"
+                    :readonly="loading3 || lock2"
                     placeholder="추천 디렉토리 경로가 없습니다"
                     v-model="new_dir_path"
                   ></v-text-field>
                 </v-col>
                 <v-col lg="1" md="1" xs="1">
-                  <v-btn v-if="msg2.length!=0" color="indigo" dark @click="msg2=''">돌아가기</v-btn>
+                  <v-btn v-if="msg2.length!=0" color="indigo" dark @click="dialog2 = false; btn2 = false; msg2=''; lock2 = false;">돌아가기</v-btn>
                   <v-btn v-else-if="!loading3" 
                     color="indigo" 
                     dark @click="accept()">
@@ -183,6 +183,7 @@
       dialog1: false,
       overlay: false,
       lock1: false,
+      lock2: false,
       parentPath: "",
     }),
     created: function() {
@@ -204,6 +205,9 @@
     methods: {
       ...mapMutations('fetch',[
         'switchOff'
+      ]),
+      ...mapMutations('fetch',[
+        'switchOn'
       ]),
       fetch() {
         var that = this;
@@ -292,8 +296,8 @@
                   that.file = undefined;
                   that.new_dir_path = '';
                   this.msg2 = "파일 업로드에 성공했습니다. 더 업로드하고 싶다면 '돌아가기' 버튼을 눌러주세요";
+                  this.switchOn();
                 }, 2000);
-                this.fetch();
               });
           } catch (error) {
             setTimeout(() => {
@@ -334,6 +338,7 @@
                     that.loading1 = false;
                     that.btn1 = true;
                     this.msg1 = "성공적으로 디렉토리를 만들었습니다";
+                    this.switchOn();
                   }, 2000);
               });
           } catch (error) {
@@ -343,7 +348,7 @@
         });
       },
       track() {
-        
+
       }
     }
   }
