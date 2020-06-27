@@ -3,6 +3,7 @@ import pickle
 import secrets
 
 INIT_PICKLE = '/home/data/init.pkl'
+os.makedirs('/home/data',exist_ok=True)
 
 def find_db(root_path):
     init_pickle = dict()

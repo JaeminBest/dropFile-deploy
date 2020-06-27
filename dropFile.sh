@@ -10,6 +10,7 @@ case "$1" in
     # echo "[ WATCH ] watching your download default directory '$WATCH'..."
     docker-compose up -d
     docker start $CONTAINER
+    python -c "import os; os.system('npm install') if not os.path.isdir('./node_modules') else None"
     echo "wait for application booting.. about 40 sec required"
     sleep 40
     ;;
