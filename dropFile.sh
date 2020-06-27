@@ -10,6 +10,8 @@ case "$1" in
     # echo "[ WATCH ] watching your download default directory '$WATCH'..."
     docker-compose up -d
     docker start $CONTAINER
+    echo "wait for application booting.. about 40 sec required"
+    sleep 40
     ;;
   stop)
     docker rm -f $CONTAINER

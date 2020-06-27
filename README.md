@@ -25,6 +25,7 @@ If you start this process first time, it will takes some time since it is buildi
 Also, if (root_path) is new directory hierarchy that has never initialized, it will also takes some time for initializing and preparing data.  
 This program lazily update recommendation data to provide better recommendation. With not enough recommendation data accumulated, this program will mis-predict or never return file path for input upload file.  
 We are currently linking OS download trigger into this web app. (2020.06.18)  
++) ROOT should not be "./data", this is metadata directory that store pickle value of DTM and word vocab
 
 
 ## Development Guide  
@@ -34,5 +35,4 @@ If you want to hack this code, just try below command and find out what's going 
 /path/to/dropFile-deploy % ROOT=(root_path) dropFile start (if you want to launch program and see web app)
 /path/to/dropFile-deploy % dropFile bash (this will open docker container bash shell) 
 /path/to/dropFile-deploy % dropFile logs (this will show actual log of what's going on)
-
 ```
