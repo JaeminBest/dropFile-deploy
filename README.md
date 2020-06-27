@@ -13,6 +13,8 @@ Also need docker(here 19.03.8) and docker-compose(here 1.25.5)
 Docker : https://docs.docker.com/get-docker/  
 Docker-Compose : https://docs.docker.com/compose/install/  
 ```
+(use this command to pull)
+/path/to/dropFile-deploy % git clone --recurse-submodules https://github.com/JaeminBest/dropFile-deploy.git
 (after installing Docker and Docker-Compose)
 /path/to/dropFile-deploy % source setting.sh
 /path/to/dropFile-deploy % ROOT=(root_path) dropFile start (if you want to launch program and see web app)
